@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useMobileDB } from './hooks/useMobileDB';
 import AdminPanelMobile from './components/AdminPanelMobile';
 import Cart from './components/Cart';
+import CashierScreen from './components/CashierScreen';
 import { db } from './db';
 import { useProducts } from './hooks/useProducts';
 import { useOrders } from './hooks/useOrders';
@@ -13,7 +14,7 @@ import { useCart } from './hooks/useCart';
 console.log('[AppMobile] Запуск мобильного приложения...');
 
 function AppMobile() {
-  const [activeTab, setActiveTab] = useState('products');
+  const [activeTab, setActiveTab] = useState('cashier');
   const [currentCashier, setCurrentCashier] = useState('Кассир 1');
   const [isShiftOpen, setIsShiftOpen] = useState(false);
   
@@ -23,6 +24,9 @@ function AppMobile() {
   const shifts = useShifts(currentCashier, null);
   const reports = useReports();
   const cart = useCart();
+
+  // Получаем текущую смену для передачи в CashierScreen
+  const currentShift = shifts.currentShift;
 
   useEffect(() => {
     console.log('[AppMobile] Компонент смонтирован');
@@ -110,6 +114,12 @@ function AppMobile() {
       <nav className="card">
         <div className="flex gap-10">
           <button 
+            className={`btn ${activeTab === 'cashier' ? 'btn-primary' : 'btn-light'}`}
+            onClick={() => setActiveTab('cashier')}
+          >
+            Кассир
+          </button>
+          <button 
             className={`btn ${activeTab === 'products' ? 'btn-primary' : 'btn-light'}`}
             onClick={() => setActiveTab('products')}
           >
@@ -137,6 +147,10 @@ function AppMobile() {
       </nav>
 
       <main className="container">
+        {activeTab === 'cashier' && (
+          <CashierScreen currentShift={currentShift} />
+        )}
+        
         {activeTab === 'products' && (
           <AdminPanelMobile
             products={products}
