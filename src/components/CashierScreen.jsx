@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDatabase } from '../hooks/useDatabase';
 import { useCart } from '../hooks/useCart';
 import Cart from './Cart';
+import OrderHistory from './OrderHistory';
 import './CashierScreen.css';
 
 const CashierScreen = ({ currentShift }) => {
@@ -14,6 +15,7 @@ const CashierScreen = ({ currentShift }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [allProducts, setAllProducts] = useState([]);
   const [showCart, setShowCart] = useState(false);
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
 
   useEffect(() => {
     loadCategories().then(setCategories);
@@ -67,8 +69,7 @@ const CashierScreen = ({ currentShift }) => {
   };
 
   const handleShowOrderHistory = () => {
-    // TODO: Реализовать кнопку "История заказов"
-    console.log("Кнопка истории заказов нажата");
+    setShowOrderHistory(true);
   };
 
   if (!currentShift) {
@@ -148,6 +149,13 @@ const CashierScreen = ({ currentShift }) => {
             />
           </div>
         </div>
+      )}
+
+      {showOrderHistory && (
+        <OrderHistory 
+          currentShift={currentShift}
+          onClose={() => setShowOrderHistory(false)}
+        />
       )}
     </div>
   );
