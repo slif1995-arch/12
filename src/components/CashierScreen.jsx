@@ -3,6 +3,7 @@ import { useDatabase } from '../hooks/useDatabase';
 import { useCart } from '../hooks/useCart';
 import Cart from './Cart';
 import OrderHistory from './OrderHistory';
+import ExpenseModal from './ExpenseModal';
 import './CashierScreen.css';
 
 const CashierScreen = ({ currentShift }) => {
@@ -16,6 +17,7 @@ const CashierScreen = ({ currentShift }) => {
   const [allProducts, setAllProducts] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
 
   useEffect(() => {
     loadCategories().then(setCategories);
@@ -64,8 +66,7 @@ const CashierScreen = ({ currentShift }) => {
   };
 
   const handleShowExpenses = () => {
-    // TODO: Реализовать кнопку "Расходы"
-    console.log("Кнопка расходов нажата");
+    setShowExpenseModal(true);
   };
 
   const handleShowOrderHistory = () => {
@@ -155,6 +156,16 @@ const CashierScreen = ({ currentShift }) => {
         <OrderHistory 
           currentShift={currentShift}
           onClose={() => setShowOrderHistory(false)}
+        />
+      )}
+
+      {showExpenseModal && (
+        <ExpenseModal 
+          currentShift={currentShift}
+          onClose={() => setShowExpenseModal(false)}
+          onExpenseAdded={() => {
+            // Optionally refresh expenses list here
+          }}
         />
       )}
     </div>
