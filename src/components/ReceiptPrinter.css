@@ -1,0 +1,210 @@
+.receipt-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.receipt {
+  background: white;
+  padding: 20px;
+  margin: 20px;
+  max-width: 400px;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.receipt-header {
+  text-align: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.receipt-title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.establishment-name {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.receipt-date {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.cashier-name {
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.category {
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.items-section {
+  margin-bottom: 15px;
+}
+
+.items-header {
+  font-weight: bold;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.item-row {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #eee;
+}
+
+.item-name {
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.item-qty {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.item-comment {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.no-items {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  padding: 10px;
+}
+
+.summary-section {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #ccc;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.summary-row.discount {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.summary-row.final-total {
+  font-weight: bold;
+  font-size: 16px;
+  border-top: 1px solid #ccc;
+  padding-top: 5px;
+  margin-top: 5px;
+}
+
+.amount {
+  font-weight: bold;
+}
+
+.blank-lines {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid #ccc;
+}
+
+.blank-line {
+  height: 20px;
+  margin-bottom: 5px;
+  border: 1px dashed #eee;
+}
+
+.contact-info {
+  margin-top: 10px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.print-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.print-button:hover {
+  background: #0056b3;
+}
+
+/* Стили для печати */
+@media print {
+  .receipt-container {
+    display: block !important;
+    position: static;
+    width: 100%;
+    height: auto;
+    background: white;
+    box-shadow: none;
+  }
+  
+  .print-button {
+    display: none;
+  }
+  
+  .receipt {
+    box-shadow: none;
+    margin: 0;
+    padding: 10px;
+  }
+}
+
+/* Адаптивные стили для мобильных устройств */
+@media (max-width: 480px) {
+  .receipt {
+    margin: 10px;
+    padding: 15px;
+    font-size: 12px;
+  }
+  
+  .receipt-title,
+  .establishment-name {
+    font-size: 14px;
+  }
+  
+  .summary-row.final-total {
+    font-size: 14px;
+  }
+}
