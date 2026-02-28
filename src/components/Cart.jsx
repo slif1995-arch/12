@@ -1,11 +1,13 @@
 // src/components/Cart.jsx - Mobile cart component
 import React, { useState } from 'react';
 import CartItemEditModal from './CartItemEditModal';
+import PaymentModal from './PaymentModal';
 
-const Cart = ({ cart, orders, products, isShiftOpen, removeFromCart, updateQuantity, onClose }) => {
+const Cart = ({ cart, orders, products, isShiftOpen, currentShift, removeFromCart, updateQuantity, onClose, onCompleteOrder }) => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [editingItem, setEditingItem] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   console.log('[Cart] Рендер корзины');
 
@@ -35,7 +37,8 @@ const Cart = ({ cart, orders, products, isShiftOpen, removeFromCart, updateQuant
 
   const handleCompleteOrder = () => {
     console.log('[Cart] Завершение заказа');
-    // Логика завершения заказа
+    // Показываем модальное окно оплаты
+    setShowPaymentModal(true);
   };
 
   const handleSelectOrder = (order) => {
@@ -57,8 +60,24 @@ const Cart = ({ cart, orders, products, isShiftOpen, removeFromCart, updateQuant
     setEditingItem(null);
   };
 
-  const cartTotal = cart.getTotal ? cart.getTotal() : 0;
-  const cartItems = cart.cart || [];
+  const handlePaymentConfirm = async (paymentData) => {
+    console.log('[Cart] Подтверждение оплаты:', paymentData);
+    // Вызываем функцию завершения заказа с данными оплаты
+    try {
+      await onCompleteOrder(cart, paymentData);
+      setShowPaymentModal(false);
+    } catch (error) {
+      console.error('[Cart] Ошибка завершения заказа:', error);
+    }
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
+  };
+
+  const cartTotal = cart.reduce((total, item) => {
+    return total + (item.price * item.quantity);
+  }, 0);
 
   return (
     <div className="cart">
@@ -67,10 +86,10 @@ const Cart = ({ cart, orders, products, isShiftOpen, removeFromCart, updateQuant
           <h3>Корзина</h3>
           <div className="flex gap-10">
             <span className="badge badge-info">
-              Товаров: {cart.getItemCount ? cart.getItemCount() : 0}
+              Товаров: {cart.length}
             </span>
             <span className="badge badge-success">
-              Сумма: {cartTotal} ₽
+              Сумма: {cartTotal.toFixed(2)} ₽
             </span>
           </div>
         </div>
@@ -87,29 +106,29 @@ const Cart = ({ cart, orders, products, isShiftOpen, removeFromCart, updateQuant
               </tr>
             </thead>
             <tbody>
-              {cartItems.length > 0 ? (
-                cartItems.map(item => (
+              {cart.length > 0 ? (
+                cart.map(item => (
                   <tr key={item.id}>
                     <td>{item.name}</td>
-                    <td>{item.price} ₽</td>
+                    <td>{item.price.toFixed(2)} ₽</td>
                     <td>
                       <div className="flex gap-5 align-center">
                         <button 
                           className="btn btn-sm"
-                          onClick={() => handleUpdateQuantity(item.id, item.qty - 1)}
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                         >
                           -
                         </button>
-                        <span>{item.qty}</span>
+                        <span>{item.quantity}</span>
                         <button 
                           className="btn btn-sm"
-                          onClick={() => handleUpdateQuantity(item.id, item.qty + 1)}
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                         >
                           +
                         </button>
                       </div>
                     </td>
-                    <td>{(item.price * item.qty).toFixed(2)} ₽</td>
+                    <td>{(item.price * item.quantity).toFixed(2)} ₽</td>
                     <td>
                       <button 
                         className="btn btn-danger btn-sm"
@@ -142,14 +161,14 @@ const Cart = ({ cart, orders, products, isShiftOpen, removeFromCart, updateQuant
             <button 
               className="btn btn-success"
               onClick={handleCreateOrder}
-              disabled={!isShiftOpen || cartItems.length === 0}
+              disabled={!isShiftOpen || cart.length === 0}
             >
               Создать заказ
             </button>
             <button 
               className="btn btn-primary"
               onClick={handleCompleteOrder}
-              disabled={!isShiftOpen || cartItems.length === 0}
+              disabled={!isShiftOpen || cart.length === 0}
             >
               Завершить заказ
             </button>
@@ -157,115 +176,13 @@ const Cart = ({ cart, orders, products, isShiftOpen, removeFromCart, updateQuant
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <h3>Активные заказы</h3>
-        </div>
-        
-        <div className="table-responsive">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Категория</th>
-                <th>Товары</th>
-                <th>Сумма</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.orders && orders.orders.length > 0 ? (
-                orders.orders.map(order => (
-                  <tr key={order.id} className={selectedOrder?.id === order.id ? 'table-active' : ''}>
-                    <td>{order.id}</td>
-                    <td>{order.category}</td>
-                    <td>{order.items ? order.items.length : 0} позиций</td>
-                    <td>
-                      {order.items ? order.items.reduce((sum, item) => sum + (item.price * item.qty), 0) : 0} ₽
-                    </td>
-                    <td>
-                      <button 
-                        className="btn btn-info btn-sm"
-                        onClick={() => handleSelectOrder(order)}
-                      >
-                        Выбрать
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" className="text-center text-muted">
-                    Активные заказы не найдены
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {selectedOrder && (
-        <div className="card">
-          <div className="card-header">
-            <h3>Детали заказа {selectedOrder.id}</h3>
-          </div>
-          
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Цена</th>
-                  <th>Количество</th>
-                  <th>Сумма</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedOrder.items && selectedOrder.items.length > 0 ? (
-                  selectedOrder.items.map(item => (
-                    <tr key={item.id}>
-                      <td>{item.name}</td>
-                      <td>{item.price} ₽</td>
-                      <td>{item.qty}</td>
-                      <td>{(item.price * item.qty).toFixed(2)} ₽</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="text-center text-muted">
-                      Товары не найдены
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th colSpan="3" className="text-right">Итого:</th>
-                  <th>
-                    {selectedOrder.items ? selectedOrder.items.reduce((sum, item) => sum + (item.price * item.qty), 0) : 0} ₽
-                  </th>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          
-          <div className="card-footer">
-            <div className="flex gap-10">
-              <select 
-                className="form-select"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                <option value="CASH">Наличные</option>
-                <option value="TRANSFER">Карта</option>
-              </select>
-              <button className="btn btn-success">
-                Оплатить
-              </button>
-            </div>
-          </div>
-        </div>
+      {showPaymentModal && (
+        <PaymentModal
+          cart={cart}
+          currentShift={currentShift}
+          onConfirm={handlePaymentConfirm}
+          onCancel={handlePaymentCancel}
+        />
       )}
     </div>
   );
