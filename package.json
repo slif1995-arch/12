@@ -1,0 +1,36 @@
+{
+  "name": "sushi-pos-android",
+  "version": "1.0.0",
+  "description": "Mobile POS system for Android",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:mobile": "vite build",
+    "capacitor:sync": "npx cap sync android"
+  },
+  "keywords": [
+    "pos",
+    "mobile",
+    "android"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.1.0",
+    "@capacitor-community/sqlite": "^8.0.0",
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/filesystem": "^8.1.0",
+    "@capacitor/preferences": "^8.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^5.0.0"
+  }
+}

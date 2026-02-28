@@ -1,0 +1,439 @@
+/* CashierSelection.css - Планшетная верстка для выбора кассира */
+
+.cashier-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #333;
+}
+
+/* Заголовок */
+.selection-header {
+  text-align: center;
+  margin-bottom: 30px;
+  width: 100%;
+  max-width: 800px;
+}
+
+.selection-header h1 {
+  font-size: 2.5rem;
+  color: white;
+  margin: 0 0 10px 0;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  font-weight: 700;
+}
+
+.selection-header p {
+  font-size: 1.2rem;
+  color: rgba(255,255,255,0.9);
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Сетка кассиров */
+.cashiers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  width: 100%;
+  max-width: 1000px;
+  padding: 20px;
+}
+
+/* Карточка кассира */
+.cashier-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 2px solid transparent;
+  min-height: 120px;
+}
+
+.cashier-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+  border-color: #667eea;
+}
+
+.cashier-card:focus {
+  outline: 3px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Аватар */
+.cashier-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-icon {
+  font-size: 2rem;
+  color: white;
+}
+
+/* Информация о кассире */
+.cashier-info {
+  flex: 1;
+  text-align: left;
+}
+
+.cashier-info h3 {
+  margin: 0 0 5px 0;
+  font-size: 1.5rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.cashier-position {
+  margin: 0;
+  font-size: 1rem;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Действия */
+.cashier-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #f8f9fa;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.select-arrow {
+  font-size: 1.5rem;
+  color: #667eea;
+  font-weight: bold;
+}
+
+/* Сообщения */
+.no-cashiers {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.no-cashiers p {
+  margin: 0 0 10px 0;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.hint {
+  font-size: 1rem;
+  color: #999;
+  font-style: italic;
+}
+
+/* Загрузка */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading p {
+  color: white;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+/* Ошибки */
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.error p {
+  color: #dc3545;
+  font-size: 1.2rem;
+  margin: 0 0 20px 0;
+}
+
+.retry-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.retry-btn:hover {
+  background: #5a67d8;
+}
+
+/* Модальное окно */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 0;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 24px;
+  border-radius: 16px 16px 0 0;
+}
+
+.modal-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.modal-header p {
+  margin: 0;
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.amount-input {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+  transition: border-color 0.3s ease;
+  background: #f8fafc;
+}
+
+.amount-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+}
+
+.amount-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.9rem;
+  margin-top: 8px;
+  min-height: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: 14px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.btn-cancel {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.btn-cancel:hover {
+  background: #e2e8f0;
+}
+
+.btn-confirm {
+  background: #667eea;
+  color: white;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background: #5a67d8;
+  transform: translateY(-1px);
+}
+
+.btn-confirm:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .cashier-selection {
+    padding: 16px;
+  }
+  
+  .selection-header h1 {
+    font-size: 2rem;
+  }
+  
+  .selection-header p {
+    font-size: 1rem;
+  }
+  
+  .cashiers-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .cashier-card {
+    padding: 20px;
+    min-height: 100px;
+  }
+  
+  .cashier-avatar {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .avatar-icon {
+    font-size: 1.5rem;
+  }
+  
+  .cashier-info h3 {
+    font-size: 1.3rem;
+  }
+  
+  .cashier-position {
+    font-size: 0.9rem;
+  }
+  
+  .modal-content {
+    max-width: 95vw;
+  }
+  
+  .modal-header h2 {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .selection-header h1 {
+    font-size: 1.7rem;
+  }
+  
+  .cashier-card {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .cashier-avatar {
+    width: 45px;
+    height: 45px;
+  }
+  
+  .avatar-icon {
+    font-size: 1.3rem;
+  }
+  
+  .cashier-info h3 {
+    font-size: 1.2rem;
+  }
+  
+  .modal-content {
+    max-width: 98vw;
+  }
+  
+  .modal-header,
+  .modal-body {
+    padding: 20px;
+  }
+}

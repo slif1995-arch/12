@@ -1,0 +1,17 @@
+// src/main-mobile.jsx - Mobile entry point
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import AppMobile from './AppMobile';
+import CashierSelection from './components/CashierSelection';
+import './index.css';
+
+console.log('[main-mobile] Запуск мобильного приложения...');
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <CashierSelection />
+  </React.StrictMode>
+);
+
+console.log('[main-mobile] Приложение запущено');
