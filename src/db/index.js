@@ -1,5 +1,7 @@
 // src/db/index.js - Mobile database service
 import { Preferences } from '@capacitor/preferences';
+import { CapacitorSQLite } from '@capacitor-community/sqlite';
+import { schema } from '../database/schema';
 
 const STORAGE_KEYS = {
   PRODUCTS: 'sushi_products',
@@ -11,9 +13,19 @@ const STORAGE_KEYS = {
   EMPLOYEES: 'sushi_employees'
 };
 
+const DB_NAME = 'sushi_pos.db';
+
 class MobileDB {
+  constructor() {
+    this.isDbInitialized = false;
+  }
+
   async init() {
     console.log('[MobileDB] Инициализация базы данных...');
+    
+    // Инициализируем SQLite базу данных
+    await this.initializeSQLite();
+    
     // Проверяем, есть ли данные в localStorage
     const products = await this.getProducts();
     if (!products) {
@@ -54,6 +66,81 @@ class MobileDB {
     }
     
     console.log('[MobileDB] База данных инициализирована');
+  }
+
+  async initializeSQLite() {
+    try {
+      // Create database connection
+      await CapacitorSQLite.createConnection({
+        database: DB_NAME,
+        version: 1,
+        encrypted: false,
+        mode: 'no-encryption'
+      });
+
+      // Open database
+      await CapacitorSQLite.open({ database: DB_NAME });
+
+      // Execute schema
+      await CapacitorSQLite.execute({
+        database: DB_NAME,
+        statements: schema
+      });
+
+      // Insert default employee if none exist
+      await this.insertDefaultEmployees();
+      
+      // Insert default expense types if none exist
+      await this.insertDefaultExpenseTypes();
+
+      this.isDbInitialized = true;
+      console.log('SQLite database initialized successfully');
+    } catch (error) {
+      console.error('Error initializing SQLite database:', error);
+      throw error;
+    }
+  }
+
+  async insertDefaultEmployees() {
+    const result = await CapacitorSQLite.query({
+      database: DB_NAME,
+      statement: 'SELECT COUNT(*) as count FROM employees',
+      values: []
+    });
+
+    if (result.values && result.values.length > 0 && result.values[0].count === 0) {
+      await CapacitorSQLite.execute({
+        database: DB_NAME,
+        statements: `
+          INSERT INTO employees (name, position, active) VALUES 
+          ('Кассир 1', 'cashier', 1),
+          ('Кассир 2', 'cashier', 1),
+          ('Администратор', 'admin', 1)
+        `
+      });
+    }
+  }
+
+  async insertDefaultExpenseTypes() {
+    const result = await CapacitorSQLite.query({
+      database: DB_NAME,
+      statement: 'SELECT COUNT(*) as count FROM expense_types',
+      values: []
+    });
+
+    if (result.values && result.values.length > 0 && result.values[0].count === 0) {
+      await CapacitorSQLite.execute({
+        database: DB_NAME,
+        statements: `
+          INSERT INTO expense_types (name) VALUES 
+          ('Продукты'),
+          ('Упаковка'),
+          ('Коммунальные услуги'),
+          ('Расходы на транспорт'),
+          ('Прочие расходы')
+        `
+      });
+    }
   }
 
   // Products
@@ -186,36 +273,109 @@ class MobileDB {
   }
 
   async getOpenShift(cashier) {
-    const shifts = await this.getShifts();
-    return shifts.find(s => s.cashier === cashier && !s.closedAt);
+    if (this.isDbInitialized) {
+      // Используем SQLite базу данных
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: `
+          SELECT s.*, e.name as cashier_name 
+          FROM shifts s 
+          JOIN employees e ON s.employee_id = e.id 
+          WHERE e.name = ? AND s.status = 'open' 
+          ORDER BY s.start_time DESC 
+          LIMIT 1
+        `,
+        values: [cashier]
+      });
+      return result.values && result.values.length > 0 ? result.values[0] : null;
+    } else {
+      // Используем Preferences для обратной совместимости
+      const shifts = await this.getShifts();
+      return shifts.find(s => s.cashier === cashier && !s.closedAt);
+    }
   }
 
   async openShift(cashier, initialCash) {
-    const shift = {
-      id: Date.now().toString(),
-      cashier: cashier,
-      initialCash: initialCash,
-      openedAt: new Date().toISOString(),
-      closedAt: null,
-      expectedCash: null,
-      actualCash: null,
-      difference: null
-    };
-    const shifts = await this.getShifts();
-    shifts.push(shift);
-    await this.setShifts(shifts);
-    return shift;
+    if (this.isDbInitialized) {
+      // Получаем ID сотрудника по имени
+      const employeeResult = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT id FROM employees WHERE name = ?',
+        values: [cashier]
+      });
+      
+      if (employeeResult.values && employeeResult.values.length > 0) {
+        const employeeId = employeeResult.values[0].id;
+        
+        const now = new Date().toISOString();
+        const result = await CapacitorSQLite.query({
+          database: DB_NAME,
+          statement: `
+            INSERT INTO shifts (employee_id, start_time, initial_amount, status) 
+            VALUES (?, ?, ?, 'open')
+          `,
+          values: [employeeId, now, initialCash]
+        });
+        
+        // Возвращаем созданную смену
+        const shiftResult = await CapacitorSQLite.query({
+          database: DB_NAME,
+          statement: `
+            SELECT s.*, e.name as cashier_name 
+            FROM shifts s 
+            JOIN employees e ON s.employee_id = e.id 
+            WHERE s.id = ?
+          `,
+          values: [result.changes.lastId]
+        });
+        
+        return shiftResult.values && shiftResult.values.length > 0 ? shiftResult.values[0] : null;
+      } else {
+        throw new Error('Employee not found');
+      }
+    } else {
+      // Используем Preferences для обратной совместимости
+      const shift = {
+        id: Date.now().toString(),
+        cashier: cashier,
+        initialCash: initialCash,
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        expectedCash: null,
+        actualCash: null,
+        difference: null
+      };
+      const shifts = await this.getShifts();
+      shifts.push(shift);
+      await this.setShifts(shifts);
+      return shift;
+    }
   }
 
   async closeShift(shiftId, data) {
-    const shifts = await this.getShifts();
-    const shift = shifts.find(s => s.id === shiftId);
-    if (shift) {
-      shift.closedAt = new Date().toISOString();
-      shift.expectedCash = data.expected;
-      shift.actualCash = data.actual;
-      shift.difference = data.difference;
-      await this.setShifts(shifts);
+    if (this.isDbInitialized) {
+      // Обновляем смену в SQLite базе данных
+      const now = new Date().toISOString();
+      await CapacitorSQLite.execute({
+        database: DB_NAME,
+        statements: `
+          UPDATE shifts 
+          SET end_time = ?, final_amount = ?, status = 'closed' 
+          WHERE id = ?
+        `,
+        values: [now, data.actual, shiftId]
+      });
+    } else {
+      // Используем Preferences для обратной совместимости
+      const shifts = await this.getShifts();
+      const shift = shifts.find(s => s.id === shiftId);
+      if (shift) {
+        shift.closedAt = new Date().toISOString();
+        shift.expectedCash = data.expected;
+        shift.actualCash = data.actual;
+        shift.difference = data.difference;
+        await this.setShifts(shifts);
+      }
     }
   }
 
@@ -244,52 +404,142 @@ class MobileDB {
     return newTransaction;
   }
 
-  // Employees
   async getEmployees() {
-    const { value } = await Preferences.get({ key: STORAGE_KEYS.EMPLOYEES });
-    return value ? JSON.parse(value) : [];
+    if (this.isDbInitialized) {
+      // Используем SQLite базу данных
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM employees WHERE active = 1 ORDER BY name',
+        values: []
+      });
+      return result.values || [];
+    } else {
+      // Используем Preferences для обратной совместимости
+      const { value } = await Preferences.get({ key: STORAGE_KEYS.EMPLOYEES });
+      return value ? JSON.parse(value) : [];
+    }
   }
 
   async setEmployees(employees) {
-    await Preferences.set({
-      key: STORAGE_KEYS.EMPLOYEES,
-      value: JSON.stringify(employees)
-    });
+    if (this.isDbInitialized) {
+      // Обновляем только в Preferences для обратной совместимости
+      await Preferences.set({
+        key: STORAGE_KEYS.EMPLOYEES,
+        value: JSON.stringify(employees)
+      });
+    } else {
+      await Preferences.set({
+        key: STORAGE_KEYS.EMPLOYEES,
+        value: JSON.stringify(employees)
+      });
+    }
   }
 
   async addEmployee(employee) {
-    const employees = await this.getEmployees();
-    const newEmployee = {
-      ...employee,
-      id: Date.now().toString(),
-      active: true,
-      createdAt: new Date().toISOString()
-    };
-    employees.push(newEmployee);
-    await this.setEmployees(employees);
-    return newEmployee;
+    if (this.isDbInitialized) {
+      // Добавляем в SQLite базу данных
+      const now = new Date().toISOString();
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: `
+          INSERT INTO employees (name, position, active) 
+          VALUES (?, ?, ?)
+        `,
+        values: [employee.name, employee.position || 'cashier', employee.active !== undefined ? employee.active : true]
+      });
+      
+      // Возвращаем добавленного сотрудника
+      const newEmployee = {
+        id: result.changes.lastId,
+        ...employee,
+        createdAt: now
+      };
+      
+      return newEmployee;
+    } else {
+      // Используем Preferences для обратной совместимости
+      const employees = await this.getEmployees();
+      const newEmployee = {
+        ...employee,
+        id: Date.now().toString(),
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      employees.push(newEmployee);
+      await this.setEmployees(employees);
+      return newEmployee;
+    }
   }
 
   async updateEmployee(id, updates) {
-    const employees = await this.getEmployees();
-    const index = employees.findIndex(e => e.id === id);
-    if (index !== -1) {
-      employees[index] = { ...employees[index], ...updates };
-      await this.setEmployees(employees);
-      return employees[index];
+    if (this.isDbInitialized) {
+      // Обновляем в SQLite базе данных
+      const fields = Object.keys(updates);
+      const values = Object.values(updates);
+      const setClause = fields.map(field => `${field} = ?`).join(', ');
+      values.push(id); // ID добавляем в конец для WHERE
+      
+      await CapacitorSQLite.execute({
+        database: DB_NAME,
+        statements: `
+          UPDATE employees 
+          SET ${setClause}
+          WHERE id = ?
+        `,
+        values: values
+      });
+      
+      // Возвращаем обновленного сотрудника
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM employees WHERE id = ?',
+        values: [id]
+      });
+      
+      return result.values && result.values.length > 0 ? result.values[0] : null;
+    } else {
+      // Используем Preferences для обратной совместимости
+      const employees = await this.getEmployees();
+      const index = employees.findIndex(e => e.id === id);
+      if (index !== -1) {
+        employees[index] = { ...employees[index], ...updates };
+        await this.setEmployees(employees);
+        return employees[index];
+      }
+      return null;
     }
-    return null;
   }
 
   async deleteEmployee(id) {
-    const employees = await this.getEmployees();
-    const filtered = employees.filter(e => e.id !== id);
-    await this.setEmployees(filtered);
+    if (this.isDbInitialized) {
+      // Удаляем из SQLite базы данных
+      await CapacitorSQLite.execute({
+        database: DB_NAME,
+        statements: 'DELETE FROM employees WHERE id = ?',
+        values: [id]
+      });
+    } else {
+      // Используем Preferences для обратной совместимости
+      const employees = await this.getEmployees();
+      const filtered = employees.filter(e => e.id !== id);
+      await this.setEmployees(filtered);
+    }
   }
 
   async getActiveCashiers() {
-    const employees = await this.getEmployees();
-    return employees.filter(e => e.active && e.position === 'Кассир');
+    if (this.isDbInitialized) {
+      // Используем SQLite базу данных
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM employees WHERE active = 1 AND position = "cashier" ORDER BY name',
+        values: []
+      });
+      return result.values || [];
+    } else {
+      // Используем Preferences для обратной совместимости
+      const employees = await this.getEmployees();
+      return employees.filter(e => e.active && e.position === 'Кассир');
+    }
   }
 
   // Settings (для совместимости)
