@@ -1,5 +1,6 @@
 // src/hooks/useOrders.js - Orders hook
 import { useState, useEffect } from 'react';
+import { OrderService } from '../services/api';
 import { db } from '../db';
 
 export const useOrders = () => {
@@ -45,19 +46,26 @@ export const useOrders = () => {
   // Создание нового заказа
   const createOrder = async (shiftId, orderType = 'delivery', paymentType = 'cash', discount = 0) => {
     // Создаем заказ в базе данных
-    const newOrder = await db.createOrder(shiftId, orderType, paymentType, discount);
+    const newOrder = await OrderService.create({
+      shift_id: shiftId,
+      order_type: orderType,
+      payment_type: paymentType,
+      discount: discount,
+      total_amount: 0,
+      status: 'pending'
+    });
     return newOrder;
   };
 
   // Обновление заказа
   const updateOrder = async (orderId, updates) => {
-    const updatedOrder = await db.updateOrder(orderId, updates);
+    const updatedOrder = await OrderService.update(orderId, updates);
     return updatedOrder;
   };
 
   // Получение заказов по смене
   const getOrdersByShift = async (shiftId) => {
-    const shiftOrders = await db.getOrdersByShift(shiftId);
+    const shiftOrders = await OrderService.getByShift(shiftId);
     return shiftOrders;
   };
 

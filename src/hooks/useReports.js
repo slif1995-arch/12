@@ -1,6 +1,6 @@
 // src/hooks/useReports.js - Reports hook
 import { useState, useCallback } from 'react';
-import { TransactionService } from '../services/api';
+import { OrderService, ShiftService, ExpenseService } from '../services/api';
 
 export const useReports = () => {
   const [reports, setReports] = useState([]);
@@ -11,8 +11,10 @@ export const useReports = () => {
   const loadReportsList = useCallback(async () => {
     try {
       console.log('[useReports] Загрузка списка отчетов...');
-      const dates = await TransactionService.getAvailableDates();
-      console.log('[useReports] Даты загружены:', dates);
+      const shifts = await ShiftService.getAll();
+      console.log('[useReports] Смены загружены:', shifts);
+      // Возвращаем уникальные даты смен
+      const dates = [...new Set(shifts.map(shift => new Date(shift.start_time).toLocaleDateString('ru-RU')))];
       setReports(dates);
     } catch (error) {
       console.error('[useReports] Ошибка загрузки списка отчетов:', error);
@@ -20,32 +22,83 @@ export const useReports = () => {
   }, []);
 
   const viewReport = useCallback(async (date) => {
-    const data = await TransactionService.getRecentSales();
-    setReportData(data);
+    const shifts = await ShiftService.getAll();
+    // Находим смены за выбранную дату
+    const shiftsForDate = shifts.filter(shift => 
+      new Date(shift.start_time).toLocaleDateString('ru-RU') === date
+    );
+    
+    if (shiftsForDate.length > 0) {
+      // Загружаем заказы и расходы для этих смен
+      let allOrders = [];
+      let allExpenses = [];
+      
+      for (const shift of shiftsForDate) {
+        const orders = await OrderService.getByShift(shift.id);
+        const expenses = await ExpenseService.getByShift(shift.id);
+        allOrders = allOrders.concat(orders);
+        allExpenses = allExpenses.concat(expenses);
+      }
+      
+      setReportData({
+        shifts: shiftsForDate,
+        orders: allOrders,
+        expenses: allExpenses,
+        date: date
+      });
+    }
+    
     setSelectedReportDate(date);
   }, []);
 
-  const calculateStats = useCallback((data) => {
-    if (!data) return null;
-    let incomeCash = 0, incomeCard = 0, expenseCash = 0, expenseTransfer = 0;
+  const calculateStats = useCallback((reportData) => {
+    if (!reportData) return null;
+    
+    let incomeCash = 0;
+    let incomeCard = 0;
+    let expenseCash = 0;
+    let expenseTransfer = 0;
+    let totalSales = 0;
+    let totalExpenses = 0;
 
-    data.forEach(t => {
-      if (t.status === 'CANCELLED') return;
-      if (t.type === 'SALE') {
-        if (t.paymentMethod === 'CASH') incomeCash += t.amount;
-        else incomeCard += t.amount;
-      } else {
-        if (t.expenseSource === 'CASH') expenseCash += t.amount;
-        else expenseTransfer += t.amount;
+    // Подсчет доходов из заказов
+    reportData.orders.forEach(order => {
+      if (order.status === 'paid') {
+        totalSales += order.total_amount;
+        if (order.payment_type === 'cash') {
+          incomeCash += order.total_amount;
+        } else if (order.payment_type === 'transfer') {
+          incomeCard += order.total_amount;
+        }
       }
     });
 
-    return { incomeCash, incomeCard, expenseCash, expenseTransfer, cashInDrawer: incomeCash - expenseCash };
+    // Подсчет расходов
+    reportData.expenses.forEach(expense => {
+      totalExpenses += expense.amount;
+      if (expense.payment_type === 'cash') {
+        expenseCash += expense.amount;
+      } else if (expense.payment_type === 'transfer') {
+        expenseTransfer += expense.amount;
+      }
+    });
+
+    const cashInDrawer = incomeCash - expenseCash;
+
+    return { 
+      incomeCash, 
+      incomeCard, 
+      expenseCash, 
+      expenseTransfer, 
+      cashInDrawer,
+      totalSales,
+      totalExpenses
+    };
   }, []);
 
   const refreshHistory = useCallback(async () => {
-    const recentSales = await TransactionService.getRecentSales();
-    setOrderHistory(recentSales);
+    const shifts = await ShiftService.getAll();
+    setOrderHistory(shifts);
   }, []);
 
   return {

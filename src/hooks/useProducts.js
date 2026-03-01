@@ -1,6 +1,6 @@
 // src/hooks/useProducts.js - Products hook
 import { useState, useCallback } from 'react';
-import { ProductService } from '../services/api';
+import { ProductService, CategoryService } from '../services/api';
 import { db } from '../db';
 
 export const useProducts = () => {
@@ -16,25 +16,14 @@ export const useProducts = () => {
       console.log('[useProducts] Продукты загружены:', dbProducts);
       setProducts(dbProducts);
       
-      const pCats = await db.getSetting('product_categories');
-      console.log('[useProducts] Категории из настроек:', pCats);
-      if (pCats) {
-        try {
-          const categoriesData = JSON.parse(pCats);
-          console.log('[useProducts] Категории распаршены:', categoriesData);
-          setCategories(categoriesData);
-          const catNames = categoriesData.map(c => typeof c === 'string' ? c : c.name);
-          console.log('[useProducts] Имена категорий:', catNames);
-          if (categoriesData.length > 0 && (!activeCat || !catNames.includes(activeCat))) {
-            const newActiveCat = catNames[0] || '';
-            console.log('[useProducts] Установка активной категории:', newActiveCat);
-            setActiveCat(newActiveCat);
-          }
-        } catch (e) {
-          console.error('[useProducts] Ошибка парсинга категорий:', e);
-        }
-      } else {
-        console.log('[useProducts] Категории не найдены в настройках');
+      const dbCategories = await CategoryService.getAll();
+      console.log('[useProducts] Категории загружены:', dbCategories);
+      setCategories(dbCategories);
+      
+      if (dbCategories.length > 0 && (!activeCat || !dbCategories.some(c => c.name === activeCat))) {
+        const newActiveCat = dbCategories[0].name || '';
+        console.log('[useProducts] Установка активной категории:', newActiveCat);
+        setActiveCat(newActiveCat);
       }
     } catch (error) {
       console.error('[useProducts] Ошибка обновления продуктов:', error);
