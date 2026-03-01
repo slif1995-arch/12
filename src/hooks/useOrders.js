@@ -1,5 +1,6 @@
 // src/hooks/useOrders.js - Orders hook
 import { useState, useEffect } from 'react';
+import { db } from '../db';
 
 export const useOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -42,19 +43,22 @@ export const useOrders = () => {
   };
 
   // Создание нового заказа
-  const createOrder = async (category) => {
-    const newOrder = {
-      id: Date.now().toString(),
-      category: category,
-      items: [],
-      createdAt: new Date().toISOString()
-    };
-    
-    const newOrders = [...orders, newOrder];
-    setOrders(newOrders);
-    saveOrders(newOrders);
-    setCurrentOrderId(newOrder.id);
-    return newOrder.id;
+  const createOrder = async (shiftId, orderType = 'delivery', paymentType = 'cash', discount = 0) => {
+    // Создаем заказ в базе данных
+    const newOrder = await db.createOrder(shiftId, orderType, paymentType, discount);
+    return newOrder;
+  };
+
+  // Обновление заказа
+  const updateOrder = async (orderId, updates) => {
+    const updatedOrder = await db.updateOrder(orderId, updates);
+    return updatedOrder;
+  };
+
+  // Получение заказов по смене
+  const getOrdersByShift = async (shiftId) => {
+    const shiftOrders = await db.getOrdersByShift(shiftId);
+    return shiftOrders;
   };
 
   // Удаление заказа
@@ -145,6 +149,8 @@ export const useOrders = () => {
     currentOrderId,
     getCurrentOrder,
     createOrder,
+    updateOrder,
+    getOrdersByShift,
     deleteOrder,
     completeOrder,
     selectOrder,

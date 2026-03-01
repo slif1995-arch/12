@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabase } from '../hooks/useDatabase';
 import { useCart } from '../hooks/useCart';
+import { useOrders } from '../hooks/useOrders';
 import Cart from './Cart';
 import OrderHistory from './OrderHistory';
+import ExpenseModal from './ExpenseModal';
+import ReceiptPrinter from './ReceiptPrinter';
 import './CashierScreen.css';
 
 const CashierScreen = ({ currentShift }) => {
   const { db, loadCategories, loadProductsByCategory, searchProducts } = useDatabase();
   const { addToCart, cart, removeFromCart, updateQuantity } = useCart();
+  const { createOrder, updateOrder } = useOrders();
   
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -16,6 +20,9 @@ const CashierScreen = ({ currentShift }) => {
   const [allProducts, setAllProducts] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showReceiptPrinter, setShowReceiptPrinter] = useState(false);
+  const [currentReceipt, setCurrentReceipt] = useState(null);
 
   useEffect(() => {
     loadCategories().then(setCategories);
@@ -64,12 +71,59 @@ const CashierScreen = ({ currentShift }) => {
   };
 
   const handleShowExpenses = () => {
-    // TODO: Реализовать кнопку "Расходы"
-    console.log("Кнопка расходов нажата");
+    setShowExpenseModal(true);
   };
 
   const handleShowOrderHistory = () => {
     setShowOrderHistory(true);
+  };
+
+  const handleCompleteOrder = async (cartItems, paymentData) => {
+    console.log('[CashierScreen] Завершение заказа:', { cartItems, paymentData });
+    
+    try {
+      // Создаем заказ в базе данных
+      const newOrder = await createOrder(
+        currentShift.id,
+        paymentData.orderType,
+        paymentData.paymentType,
+        paymentData.discount
+      );
+      
+      if (newOrder) {
+        // Рассчитываем итоговую сумму
+        const totalAmount = paymentData.finalTotal;
+        
+        // Обновляем заказ с итоговой информацией
+        await updateOrder(newOrder.id, {
+          total_amount: totalAmount,
+          status: 'paid',
+          cash_received: paymentData.cashReceived || 0,
+          change: paymentData.change || 0
+        });
+        
+        console.log('[CashierScreen] Заказ успешно создан и оплачен:', newOrder.id);
+        
+        // Подготовливаем данные для чека
+        const receiptData = {
+          ...newOrder,
+          items: cartItems,
+          timestamp: new Date().toISOString(),
+          payment_type: paymentData.paymentType,
+          cash_received: paymentData.cashReceived,
+          change: paymentData.change
+        };
+        
+        // Показываем чек-принтер
+        setCurrentReceipt(receiptData);
+        setShowReceiptPrinter(true);
+      } else {
+        console.error('[CashierScreen] Не удалось создать заказ');
+      }
+    } catch (error) {
+      console.error('[CashierScreen] Ошибка при завершении заказа:', error);
+      throw error;
+    }
   };
 
   if (!currentShift) {
@@ -146,6 +200,8 @@ const CashierScreen = ({ currentShift }) => {
               removeFromCart={removeFromCart} 
               updateQuantity={updateQuantity}
               onClose={() => setShowCart(false)}
+              onCompleteOrder={handleCompleteOrder}
+              currentShift={currentShift}
             />
           </div>
         </div>
@@ -155,6 +211,26 @@ const CashierScreen = ({ currentShift }) => {
         <OrderHistory 
           currentShift={currentShift}
           onClose={() => setShowOrderHistory(false)}
+        />
+      )}
+
+      {showExpenseModal && (
+        <ExpenseModal 
+          currentShift={currentShift}
+          onClose={() => setShowExpenseModal(false)}
+          onExpenseAdded={() => {
+            // Optionally refresh expenses list here
+          }}
+        />
+      )}
+
+      {showReceiptPrinter && currentReceipt && (
+        <ReceiptPrinter
+          order={currentReceipt}
+          cashierName={currentShift.cashier_name}
+          shiftInfo={currentShift}
+          receiptType="client"
+          onClose={() => setShowReceiptPrinter(false)}
         />
       )}
     </div>

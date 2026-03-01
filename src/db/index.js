@@ -223,18 +223,88 @@ class MobileDB {
     });
   }
 
-  async createOrder(category) {
-    const order = {
-      id: Date.now().toString(),
-      category: category,
-      items: [],
-      createdAt: new Date().toISOString()
-    };
-    const orders = await this.getOrders();
-    orders.push(order);
-    await this.setOrders(orders);
-    await this.setCurrentOrder(order);
-    return order;
+  async createOrder(shiftId, orderType = 'delivery', paymentType = 'cash', discount = 0) {
+    if (this.isDbInitialized) {
+      // Используем SQLite базу данных
+      const now = new Date().toISOString();
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: `
+          INSERT INTO orders (shift_id, order_type, payment_type, discount, total_amount, status, timestamp) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        values: [shiftId, orderType, paymentType, discount, 0, 'pending', now]
+      });
+      
+      // Возвращаем созданный заказ
+      const orderResult = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM orders WHERE id = ?',
+        values: [result.changes.lastId]
+      });
+      
+      return orderResult.values && orderResult.values.length > 0 ? orderResult.values[0] : null;
+    } else {
+      // Используем Preferences для обратной совместимости
+      const order = {
+        id: Date.now().toString(),
+        category: orderType,
+        items: [],
+        createdAt: new Date().toISOString()
+      };
+      const orders = await this.getOrders();
+      orders.push(order);
+      await this.setOrders(orders);
+      await this.setCurrentOrder(order);
+      return order;
+    }
+  }
+
+  async updateOrder(orderId, updates) {
+    if (this.isDbInitialized) {
+      // Обновляем в SQLite базе данных
+      const fields = Object.keys(updates);
+      const values = Object.values(updates);
+      const setClause = fields.map(field => `${field} = ?`).join(', ');
+      values.push(orderId); // ID добавляем в конец для WHERE
+      
+      await CapacitorSQLite.execute({
+        database: DB_NAME,
+        statements: `
+          UPDATE orders 
+          SET ${setClause}
+          WHERE id = ?
+        `,
+        values: values
+      });
+      
+      // Возвращаем обновленный заказ
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM orders WHERE id = ?',
+        values: [orderId]
+      });
+      
+      return result.values && result.values.length > 0 ? result.values[0] : null;
+    } else {
+      // Для обратной совместимости просто возвращаем null
+      return null;
+    }
+  }
+
+  async getOrdersByShift(shiftId) {
+    if (this.isDbInitialized) {
+      // Используем SQLite базу данных
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM orders WHERE shift_id = ? ORDER BY timestamp DESC',
+        values: [shiftId]
+      });
+      return result.values || [];
+    } else {
+      // Для обратной совместимости возвращаем пустой массив
+      return [];
+    }
   }
 
   async updateOrderItems(orderId, items) {
