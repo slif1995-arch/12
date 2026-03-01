@@ -1,5 +1,6 @@
 // src/hooks/useCart.js - Cart hook
 import { useState, useCallback } from 'react';
+import { OrderService } from '../services/api';
 
 export const useCart = () => {
   const [cart, setCart] = useState([]);
@@ -52,32 +53,35 @@ export const useCart = () => {
     return cart.reduce((sum, item) => sum + item.qty, 0);
   }, [cart]);
 
-  const saveCartToOrder = useCallback(async (category = 'ZAL') => {
+  const saveCartToOrder = useCallback(async (shiftId, category = 'delivery', paymentType = 'cash') => {
     if (cart.length === 0) return null;
     
-    const order = {
-      id: Date.now().toString(),
-      category: category,
-      items: [...cart],
-      createdAt: new Date().toISOString()
-    };
+    // Вычисляем общую сумму заказа
+    const totalAmount = getTotal();
     
-    // Сохраняем в localStorage
-    const savedOrders = JSON.parse(localStorage.getItem('sushi_orders') || '[]');
-    savedOrders.push(order);
-    localStorage.setItem('sushi_orders', JSON.stringify(savedOrders));
+    // Создаем заказ через сервис
+    const order = await OrderService.create({
+      shift_id: shiftId,
+      order_type: category,
+      payment_type: paymentType,
+      total_amount: totalAmount,
+      status: 'pending'
+    });
     
-    // Сохраняем как текущий заказ
-    setCurrentOrderId(order.id);
-    localStorage.setItem('sushi_current_order', order.id);
+    // Обновляем заказ с деталями корзины
+    await OrderService.update(order.id, {
+      items: [...cart]
+    });
     
     // Очищаем корзину
     clearCart();
     
     return order;
-  }, [cart, clearCart]);
+  }, [cart, clearCart, getTotal]);
 
   const loadCartFromOrder = useCallback((orderId) => {
+    // В реальной реализации загружаем заказ и его содержимое
+    // Пока используем localStorage для совместимости
     const savedOrders = JSON.parse(localStorage.getItem('sushi_orders') || '[]');
     const order = savedOrders.find(o => o.id === orderId);
     

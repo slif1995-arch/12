@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { database } from '../database';
+import { db } from '../db';
 import { useCart } from '../hooks/useCart';
 import { useOrders } from '../hooks/useOrders';
 import Cart from './Cart';
@@ -35,8 +35,7 @@ const CashierScreen = ({ currentShift }) => {
 
   const loadCategories = async () => {
     try {
-      const result = await database.query('SELECT * FROM categories ORDER BY name', []);
-      return result.values || [];
+      return await db.getCategories();
     } catch (error) {
       console.error('Ошибка загрузки категорий:', error);
       return [];
@@ -45,11 +44,8 @@ const CashierScreen = ({ currentShift }) => {
 
   const loadProductsByCategory = async (categoryId) => {
     try {
-      const result = await database.query(
-        'SELECT * FROM products WHERE category_id = ? AND active = 1 ORDER BY name',
-        [categoryId]
-      );
-      return result.values || [];
+      const allProducts = await db.getProducts();
+      return allProducts.filter(product => product.category_id == categoryId);
     } catch (error) {
       console.error('Ошибка загрузки продуктов:', error);
       return [];
@@ -58,12 +54,10 @@ const CashierScreen = ({ currentShift }) => {
 
   const searchProducts = async (searchTerm) => {
     try {
-      const term = `%${searchTerm}%`;
-      const result = await database.query(
-        'SELECT * FROM products WHERE (name LIKE ? OR barcode LIKE ?) AND active = 1 ORDER BY name',
-        [term, term]
+      const allProducts = await db.getProducts();
+      return allProducts.filter(product => 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      return result.values || [];
     } catch (error) {
       console.error('Ошибка поиска продуктов:', error);
       return [];
@@ -271,7 +265,7 @@ const CashierScreen = ({ currentShift }) => {
       {showReceiptPrinter && currentReceipt && (
         <ReceiptPrinter
           order={currentReceipt}
-          cashierName={currentShift.cashier_name}
+          cashierName={currentShift.employee_name}
           shiftInfo={currentShift}
           receiptType="client"
           onClose={() => setShowReceiptPrinter(false)}
