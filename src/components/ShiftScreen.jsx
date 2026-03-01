@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../db';
+import { database } from '../database';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 
@@ -35,7 +36,7 @@ const ShiftScreen = ({ onShiftOpened }) => {
 
       // Check for open shifts
       for (const cashier of cashiersList) {
-        const openShift = await db.getOpenShift(cashier.name);
+        const openShift = await database.getActiveShiftForEmployee(cashier.id);
         if (openShift) {
           setCurrentShift(openShift);
           break;
@@ -55,7 +56,8 @@ const ShiftScreen = ({ onShiftOpened }) => {
     }
 
     try {
-      const shift = await db.openShift(selectedCashier, parseFloat(initialCash));
+      const shiftId = await database.createShift(parseInt(selectedCashier), parseFloat(initialCash));
+      const shift = await database.getCurrentShift(parseInt(selectedCashier));
       setCurrentShift(shift);
       onShiftOpened(shift);
     } catch (error) {
@@ -91,9 +93,9 @@ const ShiftScreen = ({ onShiftOpened }) => {
     setClosingData({
       ...closingData,
       remaining: currentShift.initial_amount || currentShift.initialCash,
-      terminal: cardRevenue.toString(), // Default to card revenue
+      terminal: cardRevenue.toString(),
       fuel: '0',
-      cash: (totalRevenue - cardRevenue - cashExpenses).toString(), // Estimated cash balance
+      cash: (totalRevenue - cardRevenue - cashExpenses).toString(),
       selectedEmployees: [],
       totalRevenue: totalRevenue,
       cardRevenue: cardRevenue,
@@ -108,18 +110,19 @@ const ShiftScreen = ({ onShiftOpened }) => {
     if (!currentShift) return;
 
     try {
-      await db.closeShift(currentShift.id, {
-        remaining_balance: parseFloat(closingData.remaining),
-        terminal_balance: parseFloat(closingData.terminal),
-        fuel_expense: parseFloat(closingData.fuel),
-        cash_balance: parseFloat(closingData.cash),
-        salary_payments: 0, // Will be calculated based on selected employees
-        cash_expenses: closingData.cashExpenses,
-        transfer_expenses: closingData.transferExpenses,
-        total_revenue: closingData.totalRevenue,
-        card_revenue: closingData.cardRevenue,
-        final_amount: parseFloat(closingData.cash) + parseFloat(closingData.terminal)
-      });
+      await database.closeShift(
+        currentShift.id,
+        parseFloat(closingData.cash) + parseFloat(closingData.terminal),
+        parseFloat(closingData.cash),
+        parseFloat(closingData.terminal),
+        parseFloat(closingData.fuel),
+        parseFloat(closingData.remaining),
+        0, // salary_payments - will be calculated based on selected employees
+        closingData.cashExpenses,
+        closingData.transferExpenses,
+        closingData.totalRevenue,
+        closingData.cardRevenue
+      );
       
       setShowCloseShiftModal(false);
       setCurrentShift(null);
@@ -303,7 +306,7 @@ const ShiftScreen = ({ onShiftOpened }) => {
               >
                 <option value="">Выберите кассира</option>
                 {cashiers.map((cashier) => (
-                  <option key={cashier.id} value={cashier.name}>
+                  <option key={cashier.id} value={cashier.id}>
                     {cashier.name}
                   </option>
                 ))}

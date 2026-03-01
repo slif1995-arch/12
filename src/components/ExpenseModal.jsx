@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useDatabase } from '../hooks/useDatabase';
+import { database } from '../database';
 
 const ExpenseModal = ({ currentShift, onClose, onExpenseAdded }) => {
-  const { db } = useDatabase();
   const [expenseTypes, setExpenseTypes] = useState([]);
   const [selectedType, setSelectedType] = useState('');
   const [paymentType, setPaymentType] = useState('cash');
@@ -14,10 +13,7 @@ const ExpenseModal = ({ currentShift, onClose, onExpenseAdded }) => {
     // Load expense types from database
     const loadExpenseTypes = async () => {
       try {
-        const result = await db.query(
-          'SELECT id, name FROM expense_types ORDER BY name',
-          []
-        );
+        const result = await database.getExpenseTypes();
         setExpenseTypes(result);
         
         // Set default to first type if available
@@ -30,7 +26,7 @@ const ExpenseModal = ({ currentShift, onClose, onExpenseAdded }) => {
     };
 
     loadExpenseTypes();
-  }, [db]);
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -60,17 +56,12 @@ const ExpenseModal = ({ currentShift, onClose, onExpenseAdded }) => {
       const amountValue = parseFloat(amount);
       
       // Add expense to database
-      await db.run(
-        `INSERT INTO expenses (shift_id, expense_type_id, amount, payment_type, comment, timestamp) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          currentShift.id,
-          parseInt(selectedType),
-          amountValue,
-          paymentType,
-          comment || '',
-          new Date().toISOString()
-        ]
+      await database.addExpense(
+        currentShift.id,
+        parseInt(selectedType),
+        amountValue,
+        paymentType,
+        comment || ''
       );
 
       // Call callback to notify parent component
@@ -109,7 +100,7 @@ const ExpenseModal = ({ currentShift, onClose, onExpenseAdded }) => {
                 <option key={type.id} value={type.id}>{type.name}</option>
               ))}
             </select>
-            {errors.type && <span className="error-message">{errors.type}</span>}
+            {errors.type && <span className="error-message">{errors.type}</span>
           </div>
 
           <div className="form-group">
