@@ -18,7 +18,7 @@ function AppMobile() {
   const [currentCashier, setCurrentCashier] = useState('Кассир 1');
   const [isShiftOpen, setIsShiftOpen] = useState(false);
   
-  const mobileDB = useMobileDB();
+  const { isInitialized: dbIsInitialized, error: dbError } = useMobileDB();
   const products = useProducts();
   const orders = useOrders();
   const shifts = useShifts(currentCashier, null);
@@ -65,12 +65,12 @@ function AppMobile() {
     // Здесь будет логика печати
   };
 
-  if (mobileDB.error) {
+  if (dbError) {
     return (
       <div className="container">
         <div className="alert alert-danger">
           <h3>Ошибка базы данных</h3>
-          <p>{mobileDB.error}</p>
+          <p>{dbError}</p>
           <button className="btn btn-primary" onClick={() => window.location.reload()}>
             Перезагрузить приложение
           </button>
@@ -79,7 +79,7 @@ function AppMobile() {
     );
   }
 
-  if (!mobileDB.isInitialized) {
+  if (!dbIsInitialized) {
     return (
       <div className="container">
         <div className="card">
