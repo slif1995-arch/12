@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../db';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
 
 const ShiftScreen = ({ onShiftOpened }) => {
   const [cashiers, setCashiers] = useState([]);
@@ -7,6 +9,15 @@ const ShiftScreen = ({ onShiftOpened }) => {
   const [initialCash, setInitialCash] = useState('');
   const [currentShift, setCurrentShift] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [closingData, setClosingData] = useState({
+    remaining: '',
+    terminal: '',
+    fuel: '',
+    cash: '',
+    selectedEmployees: []
+  });
+  const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
     loadCashiersAndShift();
@@ -18,7 +29,11 @@ const ShiftScreen = ({ onShiftOpened }) => {
       const cashiersList = await db.getActiveCashiers();
       setCashiers(cashiersList);
 
-      // Проверяем, есть ли открытая смена у текущих кассиров
+      // Load all employees for salary selection
+      const allEmployees = await db.getAllEmployees();
+      setEmployees(allEmployees);
+
+      // Check for open shifts
       for (const cashier of cashiersList) {
         const openShift = await db.getOpenShift(cashier.name);
         if (openShift) {
@@ -49,25 +64,64 @@ const ShiftScreen = ({ onShiftOpened }) => {
     }
   };
 
+  const handleShowCloseShiftModal = async () => {
+    if (!currentShift) return;
+
+    // Calculate values for closing based on shift transactions
+    const shiftTransactions = await db.getShiftTransactions(currentShift.id);
+    
+    // Calculate total revenue (payments)
+    const totalRevenue = shiftTransactions.orders.reduce((sum, order) => sum + order.total_amount, 0);
+    
+    // Calculate card revenue
+    const cardRevenue = shiftTransactions.orders
+      .filter(order => order.payment_type === 'transfer')
+      .reduce((sum, order) => sum + order.total_amount, 0);
+    
+    // Calculate cash expenses
+    const cashExpenses = shiftTransactions.expenses
+      .filter(expense => expense.payment_type === 'cash')
+      .reduce((sum, expense) => sum + expense.amount, 0);
+    
+    // Calculate transfer expenses
+    const transferExpenses = shiftTransactions.expenses
+      .filter(expense => expense.payment_type === 'transfer')
+      .reduce((sum, expense) => sum + expense.amount, 0);
+
+    setClosingData({
+      ...closingData,
+      remaining: currentShift.initial_amount || currentShift.initialCash,
+      terminal: cardRevenue.toString(), // Default to card revenue
+      fuel: '0',
+      cash: (totalRevenue - cardRevenue - cashExpenses).toString(), // Estimated cash balance
+      selectedEmployees: [],
+      totalRevenue: totalRevenue,
+      cardRevenue: cardRevenue,
+      cashExpenses: cashExpenses,
+      transferExpenses: transferExpenses
+    });
+
+    setShowCloseShiftModal(true);
+  };
+
   const handleCloseShift = async () => {
     if (!currentShift) return;
 
-    // Для простоты в этом примере предполагаем, что итоговая сумма равна начальной
-    // В реальном приложении это должно быть вычислено на основе всех транзакций за смену
-    const expectedCash = currentShift.initialCash;
-    const actualCash = prompt(`Введите фактическую сумму в кассе (ожидаемая: ${expectedCash}):`, expectedCash);
-    
-    if (actualCash === null) return; // пользователь отменил
-    
-    const difference = parseFloat(actualCash) - expectedCash;
-
     try {
       await db.closeShift(currentShift.id, {
-        expected: expectedCash,
-        actual: parseFloat(actualCash),
-        difference: difference
+        remaining_balance: parseFloat(closingData.remaining),
+        terminal_balance: parseFloat(closingData.terminal),
+        fuel_expense: parseFloat(closingData.fuel),
+        cash_balance: parseFloat(closingData.cash),
+        salary_payments: 0, // Will be calculated based on selected employees
+        cash_expenses: closingData.cashExpenses,
+        transfer_expenses: closingData.transferExpenses,
+        total_revenue: closingData.totalRevenue,
+        card_revenue: closingData.cardRevenue,
+        final_amount: parseFloat(closingData.cash) + parseFloat(closingData.terminal)
       });
       
+      setShowCloseShiftModal(false);
       setCurrentShift(null);
       await loadCashiersAndShift();
     } catch (error) {
@@ -75,6 +129,139 @@ const ShiftScreen = ({ onShiftOpened }) => {
       alert('Ошибка при закрытии смены');
     }
   };
+
+  const handleEmployeeToggle = (employeeId) => {
+    setClosingData(prev => ({
+      ...prev,
+      selectedEmployees: prev.selectedEmployees.includes(employeeId)
+        ? prev.selectedEmployees.filter(id => id !== employeeId)
+        : [...prev.selectedEmployees, employeeId]
+    }));
+  };
+
+  const renderCloseShiftModal = () => (
+    <Transition appear show={showCloseShiftModal} as={Fragment}>
+      <Dialog as="div" className="relative z-10" onClose={() => setShowCloseShiftModal(false)}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black bg-opacity-25" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <Dialog.Title
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-gray-900 mb-4"
+                >
+                  Закрытие смены
+                </Dialog.Title>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Остаток</label>
+                    <input
+                      type="number"
+                      value={closingData.remaining}
+                      onChange={(e) => setClosingData({...closingData, remaining: e.target.value})}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      placeholder="Остаток"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Терминал</label>
+                    <input
+                      type="number"
+                      value={closingData.terminal}
+                      onChange={(e) => setClosingData({...closingData, terminal: e.target.value})}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      placeholder="Терминал"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Бензин</label>
+                    <input
+                      type="number"
+                      value={closingData.fuel}
+                      onChange={(e) => setClosingData({...closingData, fuel: e.target.value})}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      placeholder="Бензин"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Касса</label>
+                    <input
+                      type="number"
+                      value={closingData.cash}
+                      onChange={(e) => setClosingData({...closingData, cash: e.target.value})}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                      placeholder="Касса"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Выплата ЗП</label>
+                    <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-2">
+                      {employees.map(employee => (
+                        <div key={employee.id} className="flex items-center mb-2">
+                          <input
+                            type="checkbox"
+                            id={`employee-${employee.id}`}
+                            checked={closingData.selectedEmployees.includes(employee.id)}
+                            onChange={() => handleEmployeeToggle(employee.id)}
+                            className="mr-2"
+                          />
+                          <label htmlFor={`employee-${employee.id}`} className="text-sm">
+                            {employee.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6 flex space-x-3">
+                  <button
+                    type="button"
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md transition duration-200"
+                    onClick={handleCloseShift}
+                  >
+                    Закрыть смену
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded-md transition duration-200"
+                    onClick={() => setShowCloseShiftModal(false)}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  );
 
   if (loading) {
     return (
@@ -97,7 +284,7 @@ const ShiftScreen = ({ onShiftOpened }) => {
             <p className="text-sm text-gray-600">Начальная сумма: {(currentShift.initial_amount || currentShift.initialCash).toFixed(2)}</p>
             
             <button
-              onClick={handleCloseShift}
+              onClick={handleShowCloseShiftModal}
               className="mt-4 w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md transition duration-200"
             >
               Закрыть смену
@@ -146,6 +333,7 @@ const ShiftScreen = ({ onShiftOpened }) => {
           </div>
         )}
       </div>
+      {renderCloseShiftModal()}
     </div>
   );
 };
