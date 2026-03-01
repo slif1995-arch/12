@@ -7,95 +7,149 @@ import { useMobileDB } from './useMobileDB';
  * Предоставляет удобные методы для типовых операций
  */
 export const useDatabase = () => {
-  const { query, run, insert, isInitialized, error } = useMobileDB();
+  const { db, isInitialized, error } = useMobileDB();
 
   // === Продукты ===
   
   const getProducts = useCallback(async () => {
-    return await query('SELECT * FROM products WHERE active = 1 ORDER BY name');
-  }, [query]);
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      return await db.getProducts();
+    }
+    return await db.query('SELECT * FROM products WHERE active = 1 ORDER BY name');
+  }, [db]);
 
   const getProductById = useCallback(async (id) => {
-    const result = await query('SELECT * FROM products WHERE id = ?', [id]);
-    return result.rows?.item(0) || null;
-  }, [query]);
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      const products = await db.getProducts();
+      return products.find(p => p.id == id) || null;
+    }
+    const result = await db.query('SELECT * FROM products WHERE id = ?', [id]);
+    return result.values && result.values.length > 0 ? result.values[0] : null;
+  }, [db]);
 
   const createProduct = useCallback(async (product) => {
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      return await db.addProduct(product);
+    }
     const { name, price, category_id, image, active = 1 } = product;
-    return await insert(
+    return await db.query(
       'INSERT INTO products (name, price, category_id, image, active) VALUES (?, ?, ?, ?, ?)',
       [name, price, category_id, image, active]
     );
-  }, [insert]);
+  }, [db]);
 
   const updateProduct = useCallback(async (id, updates) => {
-    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-    const values = [...Object.values(updates), id];
-    return await run(`UPDATE products SET ${setClause} WHERE id = ?`, values);
-  }, [run]);
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      return await db.updateProduct(id, updates);
+    }
+    const fields = Object.keys(updates);
+    const values = Object.values(updates);
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    values.push(id); // Add ID as the last parameter for WHERE clause
+    return await db.execute(
+      `UPDATE products SET ${setClause} WHERE id = ?`,
+      values
+    );
+  }, [db]);
 
   // === Категории ===
 
   const getCategories = useCallback(async () => {
-    return await query('SELECT * FROM categories ORDER BY name');
-  }, [query]);
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      return await db.getCategories();
+    }
+    return await db.query('SELECT * FROM categories ORDER BY name');
+  }, [db]);
 
   const getCategoryWithProducts = useCallback(async (categoryId) => {
-    const category = await query('SELECT * FROM categories WHERE id = ?', [categoryId]);
-    const products = await query('SELECT * FROM products WHERE category_id = ? AND active = 1', [categoryId]);
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      const categories = await db.getCategories();
+      const category = categories.find(c => c.id == categoryId);
+      const products = await db.getProducts();
+      return {
+        ...category,
+        products: products.filter(p => p.category_id == categoryId && p.active)
+      };
+    }
+    const category = await db.query('SELECT * FROM categories WHERE id = ?', [categoryId]);
+    const products = await db.query('SELECT * FROM products WHERE category_id = ? AND active = 1', [categoryId]);
     return {
-      ...category.rows?.item(0),
-      products: Array.from(products.rows || [])
+      ...(category.values && category.values.length > 0 ? category.values[0] : {}),
+      products: products.values || []
     };
-  }, [query]);
+  }, [db]);
 
   // === Заказы ===
 
   const createOrder = useCallback(async (orderData) => {
-    const { customer_name, total, items, payment_method = 'cash' } = orderData;
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      return await db.createOrder(orderData.shiftId, orderData.orderType, orderData.paymentType, orderData.discount);
+    }
+    const { customer_name, total, items, payment_method = 'cash', shift_id } = orderData;
     
-    // Начинаем транзакцию (если поддерживается)
-    const orderResult = await insert(
-      'INSERT INTO orders (customer_name, total, payment_method, status, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
-      [customer_name, total, payment_method, 'pending']
+    // Start transaction for SQLite
+    const orderResult = await db.query(
+      'INSERT INTO orders (customer_name, total, payment_method, status, shift_id, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))',
+      [customer_name, total, payment_method, 'pending', shift_id]
     );
     
-    const orderId = orderResult.insertId;
+    const orderId = orderResult.changes.lastId;
     
-    // Добавляем позиции заказа
+    // Add order items
     for (const item of items) {
-      await insert(
+      await db.query(
         'INSERT INTO order_items (order_id, product_id, quantity, price, subtotal) VALUES (?, ?, ?, ?, ?)',
         [orderId, item.product_id, item.quantity, item.price, item.subtotal]
       );
     }
     
     return { orderId, ...orderResult };
-  }, [insert]);
+  }, [db]);
 
   const getOrders = useCallback(async (limit = 50) => {
-    return await query(
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      return await db.getOrders();
+    }
+    return await db.query(
       'SELECT * FROM orders ORDER BY created_at DESC LIMIT ?',
       [limit]
     );
-  }, [query]);
+  }, [db]);
 
   const getOrderWithItems = useCallback(async (orderId) => {
-    const order = await query('SELECT * FROM orders WHERE id = ?', [orderId]);
-    const items = await query(
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      const orders = await db.getOrders();
+      const order = orders.find(o => o.id == orderId);
+      return order;
+    }
+    const order = await db.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+    const items = await db.query(
       'SELECT oi.*, p.name as product_name, p.image FROM order_items oi LEFT JOIN products p ON oi.product_id = p.id WHERE oi.order_id = ?',
       [orderId]
     );
     
     return {
-      ...order.rows?.item(0),
-      items: Array.from(items.rows || [])
+      ...(order.values && order.values.length > 0 ? order.values[0] : {}),
+      items: items.values || []
     };
-  }, [query]);
+  }, [db]);
 
   const updateOrderStatus = useCallback(async (orderId, status) => {
-    return await run('UPDATE orders SET status = ?, updated_at = datetime("now") WHERE id = ?', [status, orderId]);
-  }, [run]);
+    if (!db.isDbInitialized) {
+      // Fallback to preferences if SQLite is not initialized
+      return null; // Not implemented for preferences-based storage
+    }
+    return await db.execute('UPDATE orders SET status = ?, updated_at = datetime("now") WHERE id = ?', [status, orderId]);
+  }, [db]);
 
   // === Статистика ===
 
