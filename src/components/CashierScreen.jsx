@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useDatabase } from '../hooks/useDatabase';
+import { database } from '../database';
 import { useCart } from '../hooks/useCart';
 import { useOrders } from '../hooks/useOrders';
 import Cart from './Cart';
@@ -9,7 +9,6 @@ import ReceiptPrinter from './ReceiptPrinter';
 import './CashierScreen.css';
 
 const CashierScreen = ({ currentShift }) => {
-  const { db, loadCategories, loadProductsByCategory, searchProducts } = useDatabase();
   const { addToCart, cart, removeFromCart, updateQuantity } = useCart();
   const { createOrder, updateOrder } = useOrders();
   
@@ -26,13 +25,50 @@ const CashierScreen = ({ currentShift }) => {
 
   useEffect(() => {
     loadCategories().then(setCategories);
-  }, [db]);
+  }, []);
 
   useEffect(() => {
     if (activeCategory) {
       loadProductsByCategory(activeCategory.id).then(setProducts);
     }
-  }, [activeCategory, db]);
+  }, [activeCategory]);
+
+  const loadCategories = async () => {
+    try {
+      const result = await database.query('SELECT * FROM categories ORDER BY name', []);
+      return result.values || [];
+    } catch (error) {
+      console.error('Ошибка загрузки категорий:', error);
+      return [];
+    }
+  };
+
+  const loadProductsByCategory = async (categoryId) => {
+    try {
+      const result = await database.query(
+        'SELECT * FROM products WHERE category_id = ? AND active = 1 ORDER BY name',
+        [categoryId]
+      );
+      return result.values || [];
+    } catch (error) {
+      console.error('Ошибка загрузки продуктов:', error);
+      return [];
+    }
+  };
+
+  const searchProducts = async (searchTerm) => {
+    try {
+      const term = `%${searchTerm}%`;
+      const result = await database.query(
+        'SELECT * FROM products WHERE (name LIKE ? OR barcode LIKE ?) AND active = 1 ORDER BY name',
+        [term, term]
+      );
+      return result.values || [];
+    } catch (error) {
+      console.error('Ошибка поиска продуктов:', error);
+      return [];
+    }
+  };
 
   const handleSearch = async (term) => {
     if (term.trim() === '') {
@@ -71,11 +107,19 @@ const CashierScreen = ({ currentShift }) => {
   };
 
   const handleShowExpenses = () => {
-    setShowExpenseModal(true);
+    if (currentShift) {
+      setShowExpenseModal(true);
+    } else {
+      alert('Сначала откройте смену');
+    }
   };
 
   const handleShowOrderHistory = () => {
-    setShowOrderHistory(true);
+    if (currentShift) {
+      setShowOrderHistory(true);
+    } else {
+      alert('Сначала откройте смену');
+    }
   };
 
   const handleCompleteOrder = async (cartItems, paymentData) => {
@@ -144,10 +188,10 @@ const CashierScreen = ({ currentShift }) => {
           <button className="btn btn-secondary" onClick={() => setShowCart(!showCart)}>
             Корзина ({cart.length})
           </button>
-          <button className="btn btn-warning" onClick={handleShowExpenses}>
+          <button className="btn btn-warning" onClick={handleShowExpenses} disabled={!currentShift}>
             Расходы
           </button>
-          <button className="btn btn-info" onClick={handleShowOrderHistory}>
+          <button className="btn btn-info" onClick={handleShowOrderHistory} disabled={!currentShift}>
             История заказов
           </button>
         </div>
