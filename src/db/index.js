@@ -430,10 +430,34 @@ class MobileDB {
         database: DB_NAME,
         statements: `
           UPDATE shifts 
-          SET end_time = ?, final_amount = ?, status = 'closed' 
+          SET end_time = ?, 
+              final_amount = ?,
+              remaining_balance = ?,
+              terminal_balance = ?,
+              fuel_expense = ?,
+              cash_balance = ?,
+              salary_payments = ?,
+              cash_expenses = ?,
+              transfer_expenses = ?,
+              total_revenue = ?,
+              card_revenue = ?,
+              status = 'closed' 
           WHERE id = ?
         `,
-        values: [now, data.actual, shiftId]
+        values: [
+          now, 
+          data.final_amount,
+          data.remaining_balance,
+          data.terminal_balance,
+          data.fuel_expense,
+          data.cash_balance,
+          data.salary_payments,
+          data.cash_expenses,
+          data.transfer_expenses,
+          data.total_revenue,
+          data.card_revenue,
+          shiftId
+        ]
       });
     } else {
       // Используем Preferences для обратной совместимости
@@ -596,6 +620,22 @@ class MobileDB {
     }
   }
 
+  async getAllEmployees() {
+    if (this.isDbInitialized) {
+      // Используем SQLite базу данных
+      const result = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM employees WHERE active = 1 ORDER BY name',
+        values: []
+      });
+      return result.values || [];
+    } else {
+      // Используем Preferences для обратной совместимости
+      const { value } = await Preferences.get({ key: STORAGE_KEYS.EMPLOYEES });
+      return value ? JSON.parse(value) : [];
+    }
+  }
+
   async getActiveCashiers() {
     if (this.isDbInitialized) {
       // Используем SQLite базу данных
@@ -609,6 +649,36 @@ class MobileDB {
       // Используем Preferences для обратной совместимости
       const employees = await this.getEmployees();
       return employees.filter(e => e.active && e.position === 'Кассир');
+    }
+  }
+
+  // Get shift transactions (orders and expenses) for closing calculations
+  async getShiftTransactions(shiftId) {
+    if (this.isDbInitialized) {
+      // Get orders for the shift
+      const ordersResult = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM orders WHERE shift_id = ? AND status = "paid"',
+        values: [shiftId]
+      });
+      
+      // Get expenses for the shift
+      const expensesResult = await CapacitorSQLite.query({
+        database: DB_NAME,
+        statement: 'SELECT * FROM expenses WHERE shift_id = ?',
+        values: [shiftId]
+      });
+      
+      return {
+        orders: ordersResult.values || [],
+        expenses: expensesResult.values || []
+      };
+    } else {
+      // For compatibility return empty arrays
+      return {
+        orders: [],
+        expenses: []
+      };
     }
   }
 

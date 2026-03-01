@@ -15,6 +15,15 @@ export const schema = `
     end_time TEXT DEFAULT NULL,
     initial_amount REAL DEFAULT 0,
     final_amount REAL DEFAULT NULL,
+    cash_balance REAL DEFAULT NULL,
+    terminal_balance REAL DEFAULT NULL,
+    fuel_expense REAL DEFAULT NULL,
+    remaining_balance REAL DEFAULT NULL,
+    salary_payments REAL DEFAULT NULL,
+    cash_expenses REAL DEFAULT NULL,
+    transfer_expenses REAL DEFAULT NULL,
+    total_revenue REAL DEFAULT NULL,
+    card_revenue REAL DEFAULT NULL,
     status TEXT DEFAULT 'open', -- open, closed
     FOREIGN KEY (employee_id) REFERENCES employees(id)
   );
